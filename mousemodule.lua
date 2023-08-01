@@ -33,19 +33,20 @@ function GetMouseInfo()
         Offset = RaycastResult.Instance.CFrame:Inverse() * CFrame.new(RaycastPos)
         
         if RaycastResult.Instance.AssemblyLinearVelocity.Magnitude > 100 then
-            Offset = Vector3.new(0, 0, 0)
+            Offset = CFrame.new(0, 0, 0)
         end
     end
-        
+    
     return {
-        CameraCFrame = CurrentCameraCFrame,
-        Message = MouseRay.Unit,
-        Origin = MouseRay.Origin,
-        Direction = MouseRay.Direction,
-        PositionInWorld = RaycastPos,
-        Offset = Offset,
-        WorldTarget = RaycastResult.Instance,
-        Normal = RaycastResult.Normal or Vector3.new(0, 1, 0)
+        CameraCFrame : CFrame = CurrentCameraCFrame,
+		
+        RayCameraOrigin = MouseRay.Origin,
+        RayMouseDirection = MouseRay.Direction,
+		
+        RaycastPosition = RaycastPos,
+        RaycastTargetOffset = Offset,
+        RaycastTarget = RaycastResult.Instance,
+        RaycastNormal = RaycastResult.Normal or Vector3.new(0, 1, 0)
     }
 end
 
