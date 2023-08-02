@@ -7,6 +7,7 @@ local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
 
 local Ignore = {}
+local OnReportCallbackFunctions = {}
 
 local RaycastParams = RaycastParams.new()
 RaycastParams.IgnoreWater = true
@@ -22,31 +23,37 @@ function GetMouseInfo()
 	local MouseRay = CurrentCamera:ViewportPointToRay(MouseLocationOnScreen.X, MouseLocationOnScreen.Y)
 	local CurrentCameraCFrame = CurrentCamera.CFrame
 
-	RaycastParams.FilterDescendantsInstances = {Ignore}
+    local NewIgnore = {}
+
+    for i,v in pairs( {table.unpack(Ignore)}) do
+        table.insert(NewIgnore, v)
+    end
+
+	RaycastParams.FilterDescendantsInstances = {NewIgnore, owner.Character}
 
 	local RaycastResult = workspace:Raycast(MouseRay.Origin, (MouseRay.Direction.Unit) * 2048, RaycastParams) or {}
 	local RaycastPos = RaycastResult.Position or (MouseRay.Origin + MouseRay.Direction.Unit * 2048)
-	
+
     local Offset
-        
+
     if RaycastResult.Instance ~= nil then
         Offset = RaycastResult.Instance.CFrame:Inverse() * CFrame.new(RaycastPos)
-        
+
         if RaycastResult.Instance.AssemblyLinearVelocity.Magnitude > 100 then
             Offset = CFrame.new(0, 0, 0)
         end
     end
-    
+
     return {
-        CameraCFrame : CFrame = CurrentCameraCFrame,
-		
+        CameraCFrame = CurrentCameraCFrame,
+
         RayCameraOrigin = MouseRay.Origin,
         RayMouseDirection = MouseRay.Direction,
-		
-        RaycastPosition = RaycastPos,
-        RaycastTargetOffset = Offset,
-        RaycastTarget = RaycastResult.Instance,
-        RaycastNormal = RaycastResult.Normal or Vector3.new(0, 1, 0)
+
+        Position = RaycastPos,
+        TargetOffset = Offset,
+        Target = RaycastResult.Instance,
+        Normal = RaycastResult.Normal or Vector3.new(0, 1, 0)
     }
 end
 
@@ -61,10 +68,18 @@ function ReportToServer(InputObject, GameProcessed)
         ReportTable.UserInputType = InputObject.UserInputType.Name
         ReportTable.GameProcessed = GameProcessed
     end
-        
+
     ReportTable.MouseInfo = GetMouseInfo()
-        
-    InputEvent:FireServer(ReportTable)
+
+    ;(script:FindFirstChild("InputEvent") or {FireServer = function() warn("No RemoteEvent named InputEvent inside script!") end}):FireServer(ReportTable)
+
+    for Name, Value in pairs(OnReportCallbackFunctions) do
+		local w, e = pcall(Value, ReportTable)
+        if w == false then
+            warn("A function (" .. Name .. ") has failed to run, with error: '" .. e .. "'")
+        end
+    end
+
     LastTimeSent = tick()
 end
 
@@ -81,4 +96,4 @@ task.delay(1, function()
 	end
 end)
 
-return Ignore
+return Ignore, OnReportCallbackFunctions
