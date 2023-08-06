@@ -206,9 +206,9 @@ ForceRegenerate = function()
 end
 
 ExtendedAddToRefit = function(Table, RootModel)
-    local Path = Refit.GetRelativeFullNameOf(Table.self, RootModel)
-    local StaticReferenceTable = Refit.InsertThisObjectPathToRoot(Table.self, Path, RootModel)
-    Refit.AddToRefit(Table.self, StaticReferenceTable, workspace)
+    local Path = GetRelativeFullNameOf(Table.self, RootModel)
+    local StaticReferenceTable = InsertThisObjectPathToRoot(Table.self, Path, RootModel)
+    AddToRefit(Table.self, StaticReferenceTable, workspace)
 
     return StaticReferenceTable
 end
