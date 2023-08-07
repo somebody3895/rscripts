@@ -1,6 +1,13 @@
---this refit has a few problems, for one: it only supports baseparts with the parent being workspace (for now)
---you are encouraged to either use RootOfAllThings and FindOtherTableWithName or StaticReferenceTable and StaticReferenceTable.Change("property", value, saveValueToRefit) 
---because merely referencing a soon-to-be replaced basepart is useless
+--/!\ THIS REFIT IS SCREWED UP !!! BEWARE !!!! (i'm talking LAG BOMBS screwed up (i have no idea why it got so bad from this)) /!\
+--consider reverting this commit!
+
+--[[
+   /-\
+  / | \
+ /  |  \
+/___#___\
+this is a warning sign (i tried ok i'm doing this at 2 am)
+]]
 
 local function ChangeToOriginalState(StaticReferenceTable, RefitStorageTable, Property)
 	StaticReferenceTable.self[Property] = (StaticReferenceTable.Metadata[Property] or RefitStorageTable[1][Property])
