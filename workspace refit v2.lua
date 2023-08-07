@@ -2,6 +2,39 @@
 --you are encouraged to either use RootOfAllThings and FindOtherTableWithName or StaticReferenceTable and StaticReferenceTable.Change("property", value, saveValueToRefit) 
 --because merely referencing a soon-to-be replaced basepart is useless
 
+local function ChangeToOriginalState(StaticReferenceTable, RefitStorageTable, Property)
+	StaticReferenceTable.self[Property] = (StaticReferenceTable.Metadata[Property] or RefitStorageTable[1][Property])
+end
+local function ChangeThisPropertyToThat(Property, Value)
+	return function(StaticReferenceTable)
+		StaticReferenceTable.self[Property] = Value
+	end
+end
+
+local DetectableProperties = {
+	--if it is a string, then just regenerate it
+	"CFrame",
+	"Position",
+	"Rotation",
+	{"Transparency", ChangeToOriginalState},
+	{"Color", ChangeToOriginalState},
+	{"Reflectance", ChangeToOriginalState},
+	{"Parent", ChangeThisPropertyToThat("Parent", workspace)}, --we could parent it back to workspace but they could spam-parent it (we maybe could detect this and regenerate if it happens too often)
+	{"Anchored", ChangeToOriginalState},
+	{"CanCollide", ChangeToOriginalState},
+	{"Material", ChangeToOriginalState},
+	{"Size", ChangeToOriginalState},
+	table.unpack(
+		(function()
+			local Extra = {}
+			for _,v in pairs({"Back", "Front", "Top", "Bottom", "Left", "Right"}) do
+				table.insert(Extra, {v .. "Surface", ChangeToOriginalState})
+			end
+			return Extra
+		end)()
+	)
+}
+
 local FindOtherTableWithValueEqualTo
 local FindOtherTableWithName
 local GetRelativeFullNameOf
@@ -42,7 +75,7 @@ GetRelativeFullNameOf = function(Object, RelativeObject)
 	
 	local Here = Object.Parent
 	
-	for i = 1, 12 do
+	for i = 1, 15 do
 		if Here == (RelativeObject or workspace) then
 			break
 		end
@@ -54,7 +87,7 @@ GetRelativeFullNameOf = function(Object, RelativeObject)
 end
 
 InsertThisObjectPathToRoot = function(Object, Path, PathRelativeObject)
-	local CurrentObject = PathRelativeObject
+	local CurrentObject = PathRelativeObject or workspace
 	local CurrentDirectory = RootOfAllThings
 
 	for i = #Path, 1, -1 do
@@ -66,7 +99,7 @@ InsertThisObjectPathToRoot = function(Object, Path, PathRelativeObject)
 		if NextTable == nil then
 			NextTable = setmetatable({
 				Name = NextPathInfo[2],
-				self = NextPathInfo[1], --we don't know if anything takes this place or not
+				self = NextPathInfo[1],
 				Children = {},
 				Metadata = {},
 				Parent = CurrentDirectory
@@ -85,7 +118,7 @@ InsertThisObjectPathToRoot = function(Object, Path, PathRelativeObject)
 		Name = Object.Name,
 		self = Object,
 		Children = {},
-		Metadata = {}, --such as CFrames, etc
+		Metadata = {}, --this is used for the refit (consider changing name to RefitMetadata)
 		Parent = CurrentDirectory
 	}, {
 		__index = function(self, Index)
@@ -102,20 +135,18 @@ AddToRefit = function(Part, StaticReferenceTable, OptionalParent)
 	local RefitIndex = #RefitStorage + 1
 	OptionalParent = OptionalParent or workspace
 	local StaleRefitConnections = {}
-	local SecurePropertiesTable = {
-
-	}
+	local SecurePropertiesTable = {}
 
 	local Regenerate
 	local ConnectFunctions
 		
 	local Status = {
 		Regenerating = false,
-		Altering = false
+		Altering = 0
 	}
 
 	Regenerate = function(Alterable)
-		if Status.Regenerating or (Status.Altering and Alterable) then return end
+		if Status.Regenerating or (Alterable and Status.Altering > 0) then return end
 		Status.Regenerating = true
 		local OldPart = Part
 
@@ -141,7 +172,7 @@ AddToRefit = function(Part, StaticReferenceTable, OptionalParent)
 			
 		NewPart.Name = math.random()
 
-		Part = NewPart -- this does not make the cloned existing part obsolete
+		Part = NewPart
 			
 		StaticReferenceTable.self = NewPart
 
@@ -155,8 +186,29 @@ AddToRefit = function(Part, StaticReferenceTable, OptionalParent)
 	end
 
 	local function GetAlterableRegen()
-		return function()
-			Regenerate(true)
+		return function(Property)
+			local IndeedRegenerate = false
+			
+			for _,TableOrProperty in pairs(DetectableProperties) do
+				if type(TableOrProperty) == "string" then
+					if Property == TableOrProperty then
+						IndeedRegenerate = true
+						break
+					end
+				else -- table
+					if TableOrProperty[1] == Property then
+						local RefitTable = RefitStorage[RefitIndex]
+						
+						Status.Altering += 1
+						pcall(TableOrProperty[2], StaticReferenceTable, RefitTable, Property)
+						Status.Altering -= 1
+					end
+				end
+			end
+			
+			if IndeedRegenerate then
+				Regenerate(true)
+			end
 		end
 	end
 
@@ -165,11 +217,11 @@ AddToRefit = function(Part, StaticReferenceTable, OptionalParent)
 			SecurePropertiesTable[Property] = Value
 		end
 
-		Status.Altering = true
+		Status.Altering += 1
 		pcall(function()
 			Part[Property] = Value
 		end)
-		Status.Altering = false
+		Status.Altering -= 1
 	end
 
 	ConnectFunctions = function()
@@ -179,13 +231,14 @@ AddToRefit = function(Part, StaticReferenceTable, OptionalParent)
 		Part.DescendantAdded:Connect(Regenerate)
 		Part.Changed:Connect(GetAlterableRegen())
 		--This stuff gets :Destroy()ed anyway, don't worry.
-		table.insert(StaleRefitConnections, workspace.DescendantRemoving:Connect(function(RemovedPart)
-			if RemovedPart == Part then
-				Regenerate()
-			end
-		end))
-	end
 		
+		-- table.insert(StaleRefitConnections, workspace.DescendantRemoving:Connect(function(RemovedPart)
+			-- if RemovedPart == Part then
+				-- Regenerate()
+			-- end
+		-- end))
+	end
+	
 	StaticReferenceTable.Metadata.Properties = SecurePropertiesTable
 		
 	StaticReferenceTable.Change = Change
@@ -200,17 +253,17 @@ ForceRegenerate = function()
 		local RegenerationTable = RefitTable.Status
 		
 		RegenerationTable[1].Regenerating = false
-		RegenerationTable[1].Altering = false
+		RegenerationTable[1].Altering = 0
 		RegenerationTable[2]()
 	end
 end
 
 ExtendedAddToRefit = function(Table, RootModel)
-    local Path = GetRelativeFullNameOf(Table.self, RootModel)
-    local StaticReferenceTable = InsertThisObjectPathToRoot(Table.self, Path, RootModel)
-    AddToRefit(Table.self, StaticReferenceTable, workspace)
+	local Path = GetRelativeFullNameOf(Table.self, RootModel)
+	local StaticReferenceTable = InsertThisObjectPathToRoot(Table.self, Path, RootModel)
+	AddToRefit(Table.self, StaticReferenceTable, workspace)
 
-    return StaticReferenceTable
+	return StaticReferenceTable
 end
 
 return {
