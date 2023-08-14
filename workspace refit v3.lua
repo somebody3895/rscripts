@@ -62,17 +62,15 @@ local RefitStorage = {}
 FindOtherTableWithValueEqualTo = function(Table : table, ValueName : string, Value : any)
 	for Index, OtherTable in pairs(Table) do
 		if OtherTable[ValueName] == Value then
-			return OtherTable
+			return OtherTable, Index
 		end
 	end
-		
+	
 	return nil
 end
 
-FindOtherTableWithName = function(...)
-	local t = {...}
-	
-	return FindOtherTableWithValueEqualTo(t[1], "Name", t[2])
+FindOtherTableWithName = function(Table, Name)
+	return FindOtherTableWithValueEqualTo(Table, "Name", Name)
 end
 
 GetRelativeFullNameOf = function(Object, RelativeObject)
