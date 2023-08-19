@@ -133,11 +133,13 @@ AddToRefit = function(Part, StaticReferenceTable, OptionalParent)
 	local RegenerateCallbackFunctions = {}
 	local SecurePropertiesTable = setmetatable({}, {
 		__newindex = function(self, Index, Value)
-			Index = Index:lower()
-			if Index == "position" or Index == "p" then
+			local lIndex = Index:lower()
+			if lIndex == "position" or lIndex == "p" then
 				self.CFrame = CFrame.new(Value)
-			elseif Index == "rotation" or Index == "rot" then
+			elseif lIndex == "rotation" or lIndex == "rot" then
 				self.CFrame = CFrame.new(self.CFrame.Position) * CFrame.Angles((Value / 180) * math.pi)
+			else
+				self[Index] = value
 			end
 		end
 	})
