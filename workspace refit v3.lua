@@ -1,4 +1,14 @@
---until i find a way to revert workspace refit v2 into functionality, here's v3
+--this refit has a few problems, for one: it only supports baseparts with the parent being workspace (for now)
+--you are encouraged to either use RootOfAllThings and FindOtherTableWithName or StaticReferenceTable and StaticReferenceTable.Change("property", value, saveValueToRefit) 
+--because merely referencing a soon-to-be replaced basepart is useless
+
+
+
+--This version of it is absolutely busted! Mesh degrading, fake degradation, you name it! It either dies, or makes way too many copies of itself! (I'm looking at you, Fake Degradation.)
+--The worst part, is that I can't figure out *why*. I've looked through everything, nothing works.
+
+--Original file name: TRUE Workspace Refit v2 (SCREWED UP! SPARE MY SOUL!)
+
 local gameDestroy = game.Destroy --this was taken directly from darkceius's isa box as you can tell :troll:
 
 local function ChangeToOriginalState(StaticReferenceTable, RefitStorageTable, Property)
@@ -139,7 +149,7 @@ AddToRefit = function(Part, StaticReferenceTable, OptionalParent)
 			elseif lIndex == "rotation" or lIndex == "rot" then
 				self.CFrame = CFrame.new(self.CFrame.Position) * CFrame.Angles((Value / 180) * math.pi)
 			else
-				self[Index] = value
+				self[Index] = Value
 			end
 		end
 	})
