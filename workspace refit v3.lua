@@ -1,6 +1,5 @@
 --until i find a way to revert workspace refit v2 into functionality, here's v3
-
-local gameDestroy = game.Destroy
+local gameDestroy = game.Destroy --this was taken directly from darkceius's isa box as you can tell :troll:
 
 local function ChangeToOriginalState(StaticReferenceTable, RefitStorageTable, Property)
 	local ChosenProperty = (StaticReferenceTable.RefitMetadata.Properties[Property] or RefitStorageTable.Part[Property])
@@ -129,11 +128,19 @@ InsertThisObjectPathToRoot = function(Object, Path, PathRelativeObject)
 end
 
 AddToRefit = function(Part, StaticReferenceTable, OptionalParent)
-	local RefitIndex = #RefitStorage + 1
 	OptionalParent = OptionalParent or workspace
 
-	local StaleRefitConnections = {}
-	local SecurePropertiesTable = {}
+	local RegenerateCallbackFunctions = {}
+	local SecurePropertiesTable = setmetatable({}, {
+		__newindex = function(self, Index, Value)
+			Index = Index:lower()
+			if Index == "position" or Index == "p" then
+				self.CFrame = CFrame.new(Value)
+			elseif Index == "rotation" or Index == "rot" then
+				self.CFrame = CFrame.new(self.CFrame.Position) * CFrame.Angles((Value / 180) * math.pi)
+			end
+		end
+	})
 	
 	local OriginalPartChildNum = #Part:GetChildren()
 	
@@ -174,12 +181,17 @@ AddToRefit = function(Part, StaticReferenceTable, OptionalParent)
 		task.defer(pcall, gameDestroy, OlderPart)
 		pcall(gameDestroy, OldPart)
 		pcall(gameDestroy, OlderPart)
-
-		local ThisPartRefitTable = RefitStorage[RefitIndex]
 			
-		local NewPart = ThisPartRefitTable.Part:Clone()
+		local NewPart = RefitTable.Part:Clone()
 		NewPart.Name = math.random()
 		
+		for Property, Value in pairs(SecurePropertiesTable) do
+			if not pcall(function() NewPart[Property] = Value end) then
+				SecurePropertiesTable[Property] = nil
+				print("Removed " .. Property .. " because it is not a valid property for this part")
+			end
+		end
+
 		StaticReferenceTable.self = NewPart
 		CurrentPart = NewPart
 		PreviousPart = OldPart
@@ -188,11 +200,18 @@ AddToRefit = function(Part, StaticReferenceTable, OptionalParent)
 
 		Last = New
 
+		for Name, Function in pairs(RegenerateCallbackFunctions) do
+			if not pcall(Function, NewPart) then
+				error("Function " .. Name .. " failed to run!")
+			end
+		end
+
 		Status.Regenerating = false
 		
 		NewPart.Parent = OptionalParent
 		
 		Status.AlteringProperties = false
+		Status.AddingDescendants = false
 	end
 	local function IsThisPartAbnormal(ThisPart)
 		if OriginalPartChildNum ~= #ThisPart:GetChildren() then
@@ -314,16 +333,43 @@ AddToRefit = function(Part, StaticReferenceTable, OptionalParent)
 			-- end
 		-- end))
 	end
+	
+	local EmptyFunction = function() end
+
+	local Disconnect = function()
+		ConnectFunctions = EmptyFunction
+		Regenerate = EmptyFunction
+		GetFunctionThatDestroysThisChild = EmptyFunction
+		AlterableRegen = EmptyFunction
+		Change = EmptyFunction
+		AlteringRegen = EmptyFunction
+
+		StaticReferenceTable.AddChild = EmptyFunction
+		StaticReferenceTable.Change = EmptyFunction
+		StaticReferenceTable.RegenerateCallbackFunctions = nil
+
+		StaticReferenceTable.self = nil
+		StaticReferenceTable.RefitMetadata = nil
+
+		table.remove(RefitStorage, table.find(RefitStorage, RefitTable))
+
+		RefitTable = nil
+
+		pcall(gameDestroy, PreviousPart)
+		pcall(gameDestroy, CurrentPart)
+	end
 
 	StaticReferenceTable.RefitMetadata.Properties = SecurePropertiesTable
 
 	StaticReferenceTable.AddChild = AddChild
 	StaticReferenceTable.Change = Change
+	StaticReferenceTable.RegenerateCallbackFunctions = RegenerateCallbackFunctions
+	StaticReferenceTable.Disconnect = Disconnect
 
 	RefitTable.Status[1] = Status
 	RefitTable.Status[2] = Regenerate
 
-	table.insert(RefitStorage, RefitIndex, RefitTable)
+	table.insert(RefitStorage, RefitTable)
 
 	ConnectFunctions(CurrentPart)
 end
